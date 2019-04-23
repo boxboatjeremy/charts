@@ -147,6 +147,9 @@ external:
     image: "lwolf/kubectl_deployer"
     imageTag: "0.4"
     imagePullPolicy: "IfNotPresent"
+  hostPort:
+    enabled: false
+    port: 9094
 
 # Annotation to be added to Kafka pods
 podAnnotations: {}
