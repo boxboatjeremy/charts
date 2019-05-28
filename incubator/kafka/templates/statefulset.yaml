@@ -107,8 +107,13 @@ spec:
           successThreshold: {{ .Values.readinessProbe.successThreshold }}
           failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
         ports:
-        - containerPort: 9092
+        - containerPort: {{ .Values.headless.port }}
           name: kafka
+        {{- if and .Values.external.enabled .Values.external.hostPort.enabled }}
+        - containerPort: {{ .Values.external.hostPort.port }}
+          hostPort: {{ .Values.external.hostPort.port }}
+          name: kafka-ext-host
+        {{- end }}
         {{- if .Values.external.enabled }}
           {{- $replicas := .Values.replicas | int }}
           {{- $root := . }}
@@ -131,6 +136,10 @@ spec:
         - name: JMX_PORT
           value: "{{ .Values.jmx.port }}"
         {{- end }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: POD_IP
           valueFrom:
             fieldRef:
@@ -186,10 +195,8 @@ spec:
         - |
           unset KAFKA_PORT && \
           export KAFKA_BROKER_ID=${POD_NAME##*-} && \
-          {{- if eq .Values.external.type "LoadBalancer" }}
-          export LOAD_BALANCER_IP=$(echo '{{ .Values.external.loadBalancerIP }}' | tr -d '[]' | cut -d ' ' -f "$(($KAFKA_BROKER_ID + 1))") && \
-          {{- end }}
-          export KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://${POD_NAME}.{{ include "kafka.fullname" . }}-headless.${POD_NAMESPACE}:9092{{ if kindIs "string" $advertisedListenersOverride }}{{ printf ",%s" $advertisedListenersOverride }}{{ end }} && \
+          export KAFKA_LISTENERS="PLAINTEXT://0.0.0.0:{{ .Values.headless.port }},EXTERNAL://0.0.0.0:{{ .Values.external.hostPort.port }}" && \
+          export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://${POD_IP}:{{ .Values.headless.port }},{{ $advertisedListenersOverride }}" && \
           exec /etc/confluent/docker/run
         volumeMounts:
         - name: datadir
